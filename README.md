@@ -1,24 +1,23 @@
-# Orion Points — Nocturne concept
+# Orion Points — Reward Vault
 
-A complete dark redesign of Overview, Reward Store and Activity. Obsidian panels, violet glass and black-chrome artwork support a continuous interactive rewards experience.
-
-The prototype preserves the supplied September 25, 2026 Orion Points snapshot: 8,772 available Points, 943 pending, 5,943 expiring, 9,715 total earned, zero redeemed, seven rewards and ten activity entries. Reward costs, account references, dates and the supplied checkout restrictions are retained in `dist/data.js` and the interface.
+A black and blue interactive redesign of Overview, Reward Store and Activity, retaining the supplied September 25, 2026 snapshot. The original `dist/data.js` is unchanged: 8,772 available Points, 943 pending, 5,943 expiring, 9,715 total earned, zero redeemed, seven rewards and ten activity records.
 
 ## Experience
 
-- Overview: responsive reward emblem with pointer tilt and drag rotation; reward progress; account milestone maps with keyboard-accessible scrubbing and playback; earning-source exploration; recent activity.
-- Session focus: review an account milestone, save a session intention and explore a reward. Completion and the optional note are saved on the current device only. These actions award no Points.
-- Reward Store: actual WebGL 3D cards, mouse/touch browsing, card turning, keyboard controls and a fallback surface. A selected reward moves through hold-to-unlock, case opening and card reveal. An instant-open alternative and reduced-motion controls are included.
-- Activity: animated timeline, exact ledger table, status filters, account/event search, detail dialogs, CSV export and grouped expiry dates.
+- Overview connects the original account purchase, Phase 1 pass and funded milestones to their exact Points records. The sapphire/obsidian crystal represents the existing Points balance. Account history supports scrubbing and replay.
+- Reward Store keeps the angular collector borders but uses benefit-led glass pass interiors: discount value, payout timing or Labs access. Real Three.js geometry supports rotation, turning, browsing and layer separation. The reverse explains how the pass is used.
+- A new black titanium vault opens through a hold-to-unlock sequence and selected-pass reveal. There is an instant alternative; no random rewards, Points debit or voucher issuance occurs in the prototype.
+- Activity offers timeline and table views, search, exact status filters, record details, expiry batches and CSV export.
+- Local trading workspace provides session intentions/checks, an optional focus timer, a position-risk calculator based on user inputs, and an editable trade journal with delete/undo and JSON export. These tools are saved only in the current browser and award no Points.
 
-Reward reveals are previews: they neither debit Points nor issue vouchers. The selected reward is known before opening. Variable-price perks retain “From 1,500 Points”; no unavailable pricing formula is assumed. Other application areas are represented for context and are not connected to a backend. The prototype is private.
+The Points snapshot remains fixed at the user's reference date, including its expiry countdown. Variable-price rewards retain “From 1,500 Points”; no unprovided pricing formula is invented. Purchases, payouts and account changes are previews, not live transactions.
 
 ## Implementation
 
-Serve `dist` with a static HTTP server. No build step is required. The entrypoint loads `concept.css`, `concept.js`, `data.js` and `scene.js`; older prototype files remain inert and are not loaded. Three.js 0.170.0 powers the card geometry and lighting. Lucide 0.468.0 supplies interface icons. Bundled license files are in `dist/vendor`.
+Static site, served from `dist`, no build required. Entry files are `blue.js`, `blue.css`, `blue-scene.js`, `blue-tools.js` and the unchanged `data.js`. Earlier concept files remain inert. Three.js 0.170.0 and Lucide 0.468.0 are bundled with licenses. Sound defaults off, reduced motion is supported, WebGL has a card fallback, and keyboard controls are included.
 
-Black-chrome reward artwork is original generated imagery developed from the user's creative references. Artwork is a bitmap, while the reward cards are real 3D geometry. No claim is made that the bitmap case is a rigged 3D model. Animation is implemented with CSS, pointer interactions and Three.js. Sound is optional and off by default; system reduced-motion preferences are respected.
+The Points crystal and vault are original generated bitmap assets; card geometry is real 3D. The vault opening uses layered bitmap animation and does not claim a rigged 3D model. No robot or trophy imagery is loaded in this version.
 
 ## Validation
 
-Reviewed desktop and 390px mobile layouts; verified reward selection, card turn/reveal, the locked $100 reward, account switching, repeated keyboard milestone navigation, session-note validation, Activity filters, table/search, and reduced-motion controls. Browser checks confirmed WebGL rendering and no horizontal page overflow at the mobile breakpoint. Original reward and activity data are retained without changes.
+Checked desktop and 390px layouts; WebGL rendering, card inspection/layers/reverse, vault reveal, unchanged preview balance, Activity filtering/table/search/clear, position sizing (fractional and rounded-down whole units), journal save/delete/undo including 0R, and timer start/pause/reset. Verified no mobile page overflow and no browser errors in the tested flow. Reference reward and ledger data remain unchanged.
