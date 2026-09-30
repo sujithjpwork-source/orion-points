@@ -1,56 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080b12">
-  <title>Orion Points</title>
-  <meta name="description" content="Earn with every milestone. Use them on new accounts and rewards.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080b12'/%3E%3Cpath d='M32 8L39 25L56 32L39 39L32 56L25 39L8 32L25 25Z' fill='%239eaaff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#111016">
+<title>Orion Points · Your next chapter</title><meta name="description" content="Earn with every milestone. Use them on new accounts and rewards.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%238b5cf6'/%3E%3Cpath d='M32 8L39 25L56 32L39 39L32 56L25 39L8 32L25 25Z' fill='%23e6ff80'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="concept.css?v=nocturne3"><script src="vendor/lucide.min.js" defer></script><script type="module" src="concept.js?v=nocturne3"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-  <aside id="sidebar" class="sidebar">
-    <a href="#overview" class="wordmark" aria-label="Orion Points overview">ORION<span class="brand-orbit"></span></a>
-    <div class="nav-label">MAIN</div>
-    <nav class="side-nav" aria-label="Main navigation">
-      <span class="nav-item unavailable"><i data-icon="home"></i>Overview</span>
-      <span class="nav-item unavailable"><i data-icon="accounts"></i>Accounts<i data-icon="chevron"></i></span>
-      <a href="#overview" class="nav-item current"><i data-icon="spark"></i>Orion Points<span class="new-label">NEW</span></a>
-      <span class="nav-item unavailable"><i data-icon="globe"></i>Market<i data-icon="chevron"></i></span>
-      <span class="nav-item unavailable"><i data-icon="tools"></i>Tools<i data-icon="chevron"></i></span>
-    </nav>
-    <div class="nav-label">LEARNING</div><span class="nav-item unavailable"><i data-icon="book"></i>Learn<i data-icon="chevron"></i></span>
-    <div class="nav-label">ACCOUNT</div>
-    <span class="nav-item unavailable"><i data-icon="sliders"></i>Manage<i data-icon="chevron"></i></span>
-    <span class="nav-item unavailable"><i data-icon="users"></i>Community<i data-icon="chevron"></i></span>
-    <span class="nav-item unavailable"><i data-icon="settings"></i>Settings</span>
-    <button class="nav-item" data-action="help"><i data-icon="help"></i>Help</button>
-    <button class="primary challenge" data-action="checkout"><i data-icon="rocket"></i>Start New Challenge</button>
-    <div class="nav-label">SHORTCUTS</div>
-    <span class="nav-item unavailable"><i data-icon="accounts"></i>All Accounts</span>
-    <span class="nav-item unavailable"><i data-icon="download"></i>Withdrawals</span>
-    <span class="nav-item unavailable"><i data-icon="award"></i>Certificates</span>
-    <a href="#store" class="nav-item"><i data-icon="gift"></i>Reward Store</a>
-    <div class="expiry-promo"><i data-icon="clock"></i><strong>5,943 Points expire in 17 days</strong><p>Use them before October 12, 2026 — worth $59.43 on your next account.</p><button data-action="checkout">Redeem at checkout</button></div>
-    <div class="sidebar-footer"><span class="tiny-spark">✦</span> ORION FUNDED</div>
-  </aside>
-  <div class="workspace">
-    <header class="topbar">
-      <button class="icon-button mobile-menu" aria-label="Open navigation" aria-expanded="false" data-action="menu"><i data-icon="menu"></i></button>
-      <span class="date"><i data-icon="calendar"></i>Friday, September 25th, 2026</span>
-      <div class="topbar-right"><a class="balance-pill" href="#overview"><i data-icon="spark"></i><strong data-balance>8,772</strong><span>Orion Points</span></a><button class="icon-button" aria-label="How Orion Points work" data-action="help"><i data-icon="help"></i></button><span class="notification-icon" aria-label="2 notifications"><i data-icon="bell"></i><b>2</b></span><span class="avatar" aria-label="Account AM">AM</span></div>
-    </header>
-    <main id="main">
-      <div class="page-heading"><div><div class="eyebrow">YOUR ORION EXPERIENCE</div><h1>Orion Points</h1><p>Earn with every milestone. Use them on new accounts and rewards.</p></div><button class="text-button" data-action="help"><i data-icon="help"></i>How Orion Points work</button></div>
-      <nav class="tabs" aria-label="Orion Points views"><a href="#overview" data-tab="overview" class="active"><i data-icon="grid"></i>Overview</a><a href="#store" data-tab="store"><i data-icon="gift"></i>Reward Store</a><a href="#activity" data-tab="activity"><i data-icon="history"></i>Activity</a><span class="tab-balance"><i data-icon="spark"></i><span data-balance>8,772</span> Points</span></nav>
-      <div id="view"></div>
-    </main>
-    <footer class="footer"><span>© 2026 Orion Funded</span><span>Orion Points are a loyalty benefit, not money.</span></footer>
-  </div>
-  <button class="demo-trigger" data-action="demo"><i data-icon="sliders"></i>Demo controls</button>
-  <dialog id="modal" aria-labelledby="modal-title"><button class="modal-close icon-button" data-action="close" aria-label="Close dialog"><i data-icon="close"></i></button><div id="modal-content"></div></dialog>
-  <div id="toast" role="status" aria-live="polite"></div>
+<a href="#main" class="skip">Skip to content</a>
+<aside class="rail" aria-label="Application navigation">
+<a href="#overview" class="wordmark" aria-label="Orion Points overview">ORION<span>FUNDED</span></a><div class="rail-caption">TRADER SPACE</div>
+<span class="rail-link muted"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></span><span class="rail-link muted"><i data-lucide="briefcase-business"></i><span>Accounts</span></span><a href="#overview" class="rail-link active"><i data-lucide="sparkles"></i><span>Orion Points</span><b>NEW</b></a><span class="rail-link muted"><i data-lucide="chart-no-axes-combined"></i><span>Market</span></span><span class="rail-link muted"><i data-lucide="sliders-horizontal"></i><span>Tools</span></span><span class="rail-link muted"><i data-lucide="book-open"></i><span>Learn</span></span><span class="rail-link muted"><i data-lucide="users-round"></i><span>Community</span></span>
+<div class="rail-bottom"><div class="rail-promo"><img src="assets/medal-nocturne.png" alt="" width="1254" height="1254"><strong>Make every<br>milestone count.</strong><button data-action="help">Explore Orion Points</button></div><button class="rail-link" data-action="help"><i data-lucide="circle-help"></i><span>Help & support</span></button><button class="rail-link" data-action="checkout"><i data-lucide="rocket"></i><span>Start New Challenge</span></button></div>
+</aside>
+<div class="app-shell"><header class="topbar"><button class="mobile-menu icon-btn" data-action="menu" aria-label="Open navigation" aria-expanded="false"><i data-lucide="menu"></i></button><div class="breadcrumb">Your trader space <span>/</span> <strong>Orion Points</strong></div><div class="top-actions"><span class="snapshot-date">Friday, September 25th, 2026</span><a class="wallet-pill" href="#overview"><img src="assets/medal-nocturne.png" alt="" width="1254" height="1254"><strong>8,772</strong><span>Points</span></a><span class="notification" aria-label="2 notifications"><i data-lucide="bell"></i><b>2</b></span><span class="avatar" aria-label="Account AM">AM</span></div></header>
+<main id="main"><div class="section-nav"><nav aria-label="Orion Points views"><a href="#overview" data-route="overview"><span>01</span>Overview</a><a href="#store" data-route="store"><span>02</span>Reward Store</a><a href="#activity" data-route="activity"><span>03</span>Activity</a></nav><div class="sensory-controls"><button data-action="sound" aria-pressed="false" aria-label="Enable sound"><i data-lucide="volume-x"></i></button><button data-action="motion" aria-pressed="false" aria-label="Reduce motion"><i data-lucide="orbit"></i></button><button data-action="help" aria-label="How Orion Points work"><i data-lucide="info"></i></button></div></div><div id="view"></div><footer><span>© 2026 Orion Funded</span><span>Orion Points are a loyalty benefit, not money.</span><button data-action="demo">Preview controls</button></footer></main></div>
+<dialog id="modal" aria-labelledby="modal-title"><button class="modal-close icon-btn" data-action="close" aria-label="Close dialog"><i data-lucide="x"></i></button><div id="modal-content"></div></dialog><div class="toast" id="toast" role="status"></div>
 </body>
 </html>
