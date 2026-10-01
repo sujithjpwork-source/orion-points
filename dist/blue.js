@@ -1,54 +1,477 @@
-import {mountCollection} from './blue-scene.js?v=3';
+import {mountCollection} from './blue-scene.js?v=4';
 import {createWorkspace} from './blue-tools.js?v=2';
 import {rewards,activities,storeRules,loyaltyRule} from './data.js';
+
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],fmt=n=>Number(n).toLocaleString('en-US'),icon=n=>`<i data-lucide="${n}"></i>`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state={route:'overview',reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,sound:false,selected:0,filter:'All',query:'',mode:'timeline',goal:'100',account:'220687'};
+
+export const rewardStats = {
+  '5': { rarity: 'COMMON', hp: 820, power: 15000, grade: '10 GEM MINT', foil: 'cyan' },
+  '10': { rarity: 'UNCOMMON', hp: 880, power: 28000, grade: '10 GEM MINT', foil: 'emerald' },
+  '25': { rarity: 'RARE', hp: 920, power: 45000, grade: '10 GEM MINT', foil: 'gold' },
+  '100': { rarity: 'LEGENDARY', hp: 990, power: 98000, grade: '10 GEM MINT', foil: 'holo' },
+  'weekly': { rarity: 'EPIC', hp: 950, power: 62000, grade: '10 GEM MINT', foil: 'violet' },
+  'express': { rarity: 'EPIC', hp: 960, power: 75000, grade: '10 GEM MINT', foil: 'cobalt' },
+  'labs': { rarity: 'MYSTERY DROP', hp: 999, power: 99999, grade: 'PROTOTYPE', foil: 'magenta' }
+};
+
+const state={
+  route:'overview',reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
+  sound:false,selected:0,filter:'All',rarityFilter:'ALL',query:'',mode:'timeline',
+  goal:'100',account:'220687',xp:1850,level:42,streak:5
+};
+
 let scene=null,epoch=0,modalEpoch=0,toastTimer,audio;
-const art=r=>'crystal';
+
 const benefit=r=>r.id==='labs'?['ACCESS PASS','Explore new tools','Before public release']:r.id==='weekly'?['PAYOUT SCHEDULE','Every week','Instead of bi-weekly']:r.id==='express'?['PRIORITY PAYOUT','Within 24 hours','Your next payout']:['CHECKOUT CREDIT','New account · Reset · Retry','Inside the 20% Points limit'];
-function passInterior(r){const b=benefit(r);return `<div class="pass-interior"><span class="pass-chip">ORION / ${b[0]}</span><div class="pass-value">${r.value}<span>${r.id==='labs'?'EARLY ACCESS':r.variable?'PAYOUT BENEFIT':'DISCOUNT'}</span></div><div class="pass-circuit" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="pass-benefit"><b>${b[1]}</b><span>${b[2]}</span></div><span class="pass-serial">OP / 0${rewards.indexOf(r)+1} — 2026</span></div>`;}
+
+function passInterior(r){
+  const b=benefit(r);
+  const st=rewardStats[r.id]||{rarity:'RARE',hp:900,power:50000,grade:'10 GEM MINT',foil:'gold'};
+  const rarClass=st.rarity.toLowerCase().replace(/\s+/g,'-');
+  return `
+    <div class="slab-header">
+      <div class="slab-qr" aria-hidden="true"></div>
+      <div class="slab-info">
+        <span class="slab-title">ORION / ${r.name.toUpperCase()}</span>
+        <span class="slab-sub">SERIES 2026 · CERT #984211</span>
+      </div>
+      <div class="slab-grade">
+        <span class="grade-score">10</span>
+        <span class="grade-label">GEM MINT</span>
+      </div>
+    </div>
+    <div class="pass-interior foil-${st.foil}">
+      <span class="pass-chip rarity-${rarClass}">${st.rarity} PASS</span>
+      <div class="pass-value">${r.value}<span>${r.id==='labs'?'EARLY ACCESS':r.variable?'PAYOUT BENEFIT':'DISCOUNT'}</span></div>
+      <div class="pass-circuit" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pass-stats">
+        <div class="stat-badge"><span>HP</span><strong>${st.hp}</strong></div>
+        <div class="stat-badge"><span>PWR</span><strong>${st.power.toLocaleString()}</strong></div>
+      </div>
+      <div class="pass-benefit"><b>${b[1]}</b><span>${b[2]}</span></div>
+      <span class="pass-serial">OP / 0${rewards.indexOf(r)+1} — 2026</span>
+    </div>
+  `;
+}
+
 function hydrate(){window.lucide?.createIcons({attrs:{'stroke-width':1.5}});}
 function notify(t){$('#notice').textContent=t;$('#notice').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#notice').classList.remove('show'),3500);}
-function tone(win=false){if(!state.sound)return;try{audio??=new AudioContext();audio.resume();(win?[330,440,660]:[480]).forEach((hz,i)=>{const o=audio.createOscillator(),g=audio.createGain(),at=audio.currentTime+i*.1;o.frequency.value=hz;g.gain.setValueAtTime(.025,at);g.gain.exponentialRampToValueAtTime(.001,at+.25);o.connect(g).connect(audio.destination);o.start(at);o.stop(at+.25);});}catch{}}
+
+function tone(type='click'){
+  if(!state.sound)return;
+  try{
+    audio??=new(window.AudioContext||window.webkitAudioContext)();
+    audio.resume();
+    const now=audio.currentTime;
+    if(type==='hover'){
+      const o=audio.createOscillator(),g=audio.createGain();
+      o.type='sine';o.frequency.setValueAtTime(580,now);
+      g.gain.setValueAtTime(0.008,now);
+      g.gain.exponentialRampToValueAtTime(0.0001,now+0.05);
+      o.connect(g).connect(audio.destination);
+      o.start(now);o.stop(now+0.05);
+    }else if(type==='click'||type===false){
+      const o=audio.createOscillator(),g=audio.createGain();
+      o.type='triangle';o.frequency.setValueAtTime(420,now);
+      g.gain.setValueAtTime(0.03,now);
+      g.gain.exponentialRampToValueAtTime(0.001,now+0.08);
+      o.connect(g).connect(audio.destination);
+      o.start(now);o.stop(now+0.08);
+    }else if(type==='unlock'||type===true){
+      [320,480,640,960].forEach((hz,i)=>{
+        const o=audio.createOscillator(),g=audio.createGain(),at=now+i*0.08;
+        o.type='sawtooth';o.frequency.setValueAtTime(hz,at);
+        g.gain.setValueAtTime(0.04,at);
+        g.gain.exponentialRampToValueAtTime(0.001,at+0.35);
+        o.connect(g).connect(audio.destination);
+        o.start(at);o.stop(at+0.35);
+      });
+    }else if(type==='levelup'){
+      [440,554.37,659.25,880].forEach((hz,i)=>{
+        const o=audio.createOscillator(),g=audio.createGain(),at=now+i*0.09;
+        o.type='sine';o.frequency.setValueAtTime(hz,at);
+        g.gain.setValueAtTime(0.05,at);
+        g.gain.exponentialRampToValueAtTime(0.001,at+0.4);
+        o.connect(g).connect(audio.destination);
+        o.start(at);o.stop(at+0.4);
+      });
+    }
+  }catch{}
+}
+
+function playerBanner(){
+  const s=workspace?.summary();
+  const quest1Done=!!s?.prepared;
+  const quest2Done=state.selected!==undefined;
+  const quest3Done=!!(s?.reviews>0);
+  return `
+    <section class="player-banner">
+      <div class="banner-avatar">
+        <div class="avatar-emblem">${icon('shield')}</div>
+        <div class="level-badge">LVL ${state.level}</div>
+      </div>
+      <div class="banner-info">
+        <div class="player-tag">
+          <h2>RUEFUL_TRADER</h2>
+          <span class="rank-pill">${icon('award')} OBSIDIAN I</span>
+          <span class="streak-badge">${icon('zap')} ${state.streak} DAY STREAK</span>
+        </div>
+        <div class="xp-bar-container">
+          <div class="xp-labels">
+            <span>TRADER XP LEVEL</span>
+            <span>${fmt(state.xp)} / 2,500 XP TO LVL ${state.level+1}</span>
+          </div>
+          <div class="xp-track"><b style="width: ${(state.xp/2500)*100}%"></b></div>
+        </div>
+      </div>
+      <div class="banner-quests">
+        <span class="quest-title">${icon('target')} DAILY TRADER QUESTS</span>
+        <div class="quest-chips">
+          <span class="quest-chip ${quest1Done?'completed':''}">${icon(quest1Done?'check-circle-2':'circle')} Session Plan (+100 XP)</span>
+          <span class="quest-chip ${quest2Done?'completed':''}">${icon(quest2Done?'check-circle-2':'circle')} Inspect Pass (+50 XP)</span>
+          <span class="quest-chip ${quest3Done?'completed':''}">${icon(quest3Done?'check-circle-2':'circle')} Log Review (+150 XP)</span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function head(k,title,sub,side=''){return `<header class="page-head"><div><span class="eyebrow">${k}</span><h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div>${side}</header>`;}
 function pill(s){return `<span class="pill ${s==='Pending'||s==='Expiring soon'?'warn':s==='Reversed'?'negative':s==='Available'?'success':''}">${s}</span>`;}
 function stat(k,v,n,ic,cls=''){return `<div class="stat ${cls}"><span>${icon(ic)}${k}</span><strong>${v}</strong><small>${n}</small></div>`;}
-function overview(){return head('YOUR TRADER REWARDS','Orion Points','Earn with every milestone. Use them on new accounts and rewards.',`<button class="btn" data-tool="session">${icon('crosshair')}Plan my session</button>`)+`<section class="arena"><div class="arena-wallet"><span class="eyebrow">AVAILABLE ORION POINTS</span><div class="points-number">8,772<span>PTS</span></div><p>≈ $87.72 Orion Credit</p><a class="btn primary" href="#store">${icon('layers-3')}Explore rewards</a><button class="text-button" data-action="wallet">Use at checkout</button></div><div class="arena-art" tabindex="0" role="button" aria-label="Explore your funded account milestones" data-action="milestones"><div class="halo"></div><img src="assets/blue/crystal.png" alt="Faceted obsidian and blue crystal representing Orion Points" width="1254" height="1254"><span>POINTS / EARNED THROUGH MILESTONES</span></div><div class="arena-target"><span class="eyebrow">YOUR NEXT UNLOCK</span><span class="pill">First payout: +1,000</span><h2>$100<span>Discount</span></h2><div class="progress-line"><b style="width:87.72%"></b></div><div class="target-counter"><b>8,772 / 10,000</b><span>87.72%</span></div><p><strong>1,228 more Points.</strong> Converting part of your $4,200.00 payout would get you there.</p><button class="btn" data-reward="100">${icon('scan')}Inspect reward</button></div></section><section class="stat-ribbon">${stat('Pending','943','Clears Sep 30, 2026','clock-3')}${stat('Expiring in 30 days','5,943','Use before Oct 12, 2026','hourglass','warn')}${stat('Total earned','9,715','Across purchases, milestones and payouts','gem')}${stat('Total redeemed','0','Nothing expired unused','ticket')}</section><div class="expiry-strip">${icon('hourglass')}<strong>5,943 Points expire in 17 days</strong><span>Oldest Points are used first</span><a href="#activity">View expiry details</a></div><section class="earning-path"><div><span class="eyebrow">HOW YOUR PROGRESS BECOMES POINTS</span><h2>One account. Three recorded milestones.</h2><p>Account #220687 · Orion Standard $100,000</p></div><div class="earning-steps"><button data-event="5"><span>01 / PURCHASE</span><strong>+943</strong><small>Aug 16, 2026</small></button><i>＋</i><button data-event="4"><span>02 / PHASE 1 PASSED</span><strong>+314</strong><small>Aug 26, 2026</small></button><i>＋</i><button data-event="1"><span>03 / FUNDED</span><strong>+629</strong><small>Sep 13, 2026</small></button></div><button class="text-button" data-action="milestones">Replay this account journey</button></section><div class="work-grid"><section class="panel"><div class="section-head"><div><span class="eyebrow">SESSION PREPARATION</span><h2>A plan before every session.</h2></div><button class="text-button" data-tool="session">Open planner</button></div><div class="mission-list">${[['01','Review your plan','Set one clear intention.','session'],['02','Know your risk','Calculate from your own limits.','risk'],['03','Reflect & improve','Keep a private trade review.','journal']].map(([n,t,d,k])=>`<button class="mission" data-tool="${k}"><span class="number">${n}</span><span><strong>${t}</strong><small>${d}</small></span><span class="mission-check">${icon('plus')}</span></button>`).join('')}</div><p class="local-label">Local tools · No Points awarded for these steps</p></section><section class="panel"><div class="section-head"><div><span class="eyebrow">TRADER WORKSPACE</span><h2>Your edge is preparation.</h2></div></div><div class="tool-tiles">${[['crosshair','Session planner','Intention, checks & focus','session'],['calculator','Risk calculator','Position size from your inputs','risk'],['notebook-pen','Trade journal','Record, review, learn','journal'],['trophy','Milestone replay','Revisit your progress','milestones']].map(([ic,t,d,k])=>`<button class="tool-tile" ${k==='milestones'?'data-action':'data-tool'}="${k}">${icon(ic)}<strong>${t}</strong><span>${d}</span></button>`).join('')}</div></section></div><div class="lower-grid"><section class="panel"><div class="section-head"><h2>Earned by source</h2><span class="pill">9,715 total</span></div>${[['Purchases',2829],['Evaluations',1886],['Promotions',5000]].map(([n,v])=>`<div class="source-row"><span>${n}</span><i style="--w:${v/5000*35}%"></i><b>${fmt(v)}</b></div>`).join('')}</section><section class="panel"><div class="section-head"><h2>Latest activity</h2><a class="text-button" href="#activity">View all</a></div>${activities.slice(0,3).map((a,i)=>`<button class="recent-row" data-event="${i}">${icon(a.status==='Reversed'?'rotate-ccw':i?'flag':'shopping-bag')}<span><strong>${a.name}</strong><small>${a.date} · ${a.status}</small></span><b>${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}</b></button>`).join('')}</section></div>`;}
+
+function overview(){
+  return playerBanner()+
+  head('YOUR TRADER REWARDS','Orion Points','Earn with every milestone. Use them on new accounts and rewards.',`<button class="btn" data-tool="session">${icon('crosshair')}Plan my session</button>`)+
+  `<section class="arena"><div class="arena-wallet"><span class="eyebrow">AVAILABLE ORION POINTS</span><div class="points-number">8,772<span>PTS</span></div><p>≈ $87.72 Orion Credit</p><a class="btn primary" href="#store">${icon('layers-3')}Explore rewards</a><button class="text-button" data-action="wallet">Use at checkout</button></div><div class="arena-art" tabindex="0" role="button" aria-label="Explore your funded account milestones" data-action="milestones"><div class="halo"></div><img src="assets/blue/crystal.png" alt="Faceted obsidian and blue crystal representing Orion Points" width="1254" height="1254"><span>POINTS / EARNED THROUGH MILESTONES</span></div><div class="arena-target"><span class="eyebrow">YOUR NEXT UNLOCK</span><span class="pill">First payout: +1,000</span><h2>$100<span>Discount</span></h2><div class="progress-line"><b style="width:87.72%"></b></div><div class="target-counter"><b>8,772 / 10,000</b><span>87.72%</span></div><p><strong>1,228 more Points.</strong> Converting part of your $4,200.00 payout would get you there.</p><button class="btn" data-reward="100">${icon('scan')}Inspect reward</button></div></section><section class="stat-ribbon">${stat('Pending','943','Clears Sep 30, 2026','clock-3')}${stat('Expiring in 30 days','5,943','Use before Oct 12, 2026','hourglass','warn')}${stat('Total earned','9,715','Across purchases, milestones and payouts','gem')}${stat('Total redeemed','0','Nothing expired unused','ticket')}</section><div class="expiry-strip">${icon('hourglass')}<strong>5,943 Points expire in 17 days</strong><span>Oldest Points are used first</span><a href="#activity">View expiry details</a></div><section class="earning-path"><div><span class="eyebrow">HOW YOUR PROGRESS BECOMES POINTS</span><h2>One account. Three recorded milestones.</h2><p>Account #220687 · Orion Standard $100,000</p></div><div class="earning-steps"><button data-event="5"><span>01 / PURCHASE</span><strong>+943</strong><small>Aug 16, 2026</small></button><i>＋</i><button data-event="4"><span>02 / PHASE 1 PASSED</span><strong>+314</strong><small>Aug 26, 2026</small></button><i>＋</i><button data-event="1"><span>03 / FUNDED</span><strong>+629</strong><small>Sep 13, 2026</small></button></div><button class="text-button" data-action="milestones">Replay this account journey</button></section><div class="work-grid"><section class="panel"><div class="section-head"><div><span class="eyebrow">SESSION PREPARATION</span><h2>A plan before every session.</h2></div><button class="text-button" data-tool="session">Open planner</button></div><div class="mission-list">${[['01','Review your plan','Set one clear intention.','session'],['02','Know your risk','Calculate from your own limits.','risk'],['03','Reflect & improve','Keep a private trade review.','journal']].map(([n,t,d,k])=>`<button class="mission" data-tool="${k}"><span class="number">${n}</span><span><strong>${t}</strong><small>${d}</small></span><span class="mission-check">${icon('plus')}</span></button>`).join('')}</div><p class="local-label">Local tools · Earn XP for completed actions</p></section><section class="panel"><div class="section-head"><div><span class="eyebrow">TRADER WORKSPACE</span><h2>Your edge is preparation.</h2></div></div><div class="tool-tiles">${[['crosshair','Session planner','Intention, checks & focus','session'],['calculator','Risk calculator','Position size from your inputs','risk'],['notebook-pen','Trade journal','Record, review, learn','journal'],['trophy','Milestone replay','Revisit your progress','milestones']].map(([ic,t,d,k])=>`<button class="tool-tile" ${k==='milestones'?'data-action':'data-tool'}="${k}">${icon(ic)}<strong>${t}</strong><span>${d}</span></button>`).join('')}</div></section></div><div class="lower-grid"><section class="panel"><div class="section-head"><h2>Earned by source</h2><span class="pill">9,715 total</span></div>${[['Purchases',2829],['Evaluations',1886],['Promotions',5000]].map(([n,v])=>`<div class="source-row"><span>${n}</span><i style="--w:${v/5000*35}%"></i><b>${fmt(v)}</b></div>`).join('')}</section><section class="panel"><div class="section-head"><h2>Latest activity</h2><a class="text-button" href="#activity">View all</a></div>${activities.slice(0,3).map((a,i)=>`<button class="recent-row" data-event="${i}">${icon(a.status==='Reversed'?'rotate-ccw':i?'flag':'shopping-bag')}<span><strong>${a.name}</strong><small>${a.date} · ${a.status}</small></span><b>${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}</b></button>`).join('')}</section></div>`;
+}
+
 function show(html,cls=''){clearInterval(milestoneTimer);modalEpoch++;modalScene?.dispose();modalScene=null;cancelAnimationFrame(holdFrame);$('#dialog-body').innerHTML=html;$('#dialog').className=cls;if(cls!=='workspace-dialog')$('#dialog').scrollTop=0;if(!$('#dialog').open)$('#dialog').showModal();document.body.classList.add('modal-open');hydrate();}
 function close(){modalEpoch++;modalScene?.dispose();modalScene=null;cancelAnimationFrame(holdFrame);clearInterval(milestoneTimer);$('#dialog').close();document.body.classList.remove('modal-open');}
+
 function help(){show(`<span class="eyebrow">ORION POINTS</span><h2 id="dialog-title">How your Points work</h2><div class="dialog-copy"><p>Earn with purchases, evaluations and promotions. <strong>8,772 Points ≈ $87.72 Orion Credit.</strong></p><p>${storeRules}</p><p>${loyaltyRule}</p><p>The trader workspace is saved on this browser. It is separate from your Points and trading accounts.</p></div><button class="btn primary" data-action="close">Understood</button>`);}
 function wallet(){show(`<span class="eyebrow">USE AT CHECKOUT</span><h2 id="dialog-title">8,772 Orion Points</h2><div class="dialog-copy"><p>≈ $87.72 Orion Credit · Used at checkout, alongside cash</p><p><strong>New account</strong><br>any model or size · up to 20% of the price</p><p><strong>Evaluation reset</strong><br>25% of the list price · Points up to 20%</p><p><strong>Retry credit</strong><br>same model and size · Points up to 50% · within 30 days of a breach<br>No active retry credit</p><p>${storeRules}</p><p>Preview only. No purchase or account change will be made.</p></div><button class="btn primary" data-action="close">Done</button>`);}
-let modalScene=null,holdFrame=null,holding=false,charge=0,revealReward=null,milestoneTimer=null,milestoneStep=0,activityWindow='all';
-let favorites=new Set();try{favorites=new Set(JSON.parse(localStorage.getItem('orion-blue-pins')||'[]'));}catch{}
-const workspace=createWorkspace({show,notify,tone,onChange:updateProgress});
-function updateProgress(){const s=workspace?.summary();if(!s)return;$$('.mission[data-tool]').forEach(el=>{const done=el.dataset.tool==='session'?s.prepared:el.dataset.tool==='risk'?s.risk:s.reviews>0;el.classList.toggle('done',done);el.querySelector('.mission-check').innerHTML=icon(done?'circle-check':'plus');});hydrate();}
-function collector(r,back=false){return `<div class="collector ${back?'back':''}" style="--variant:${rewards.indexOf(r)}"><div class="collector-rim"></div><div class="collector-top"><span>ORION <b>/ REWARDS</b></span><small>0${rewards.indexOf(r)+1}/07</small></div>${passInterior(r)}<span class="collector-side">ORION FUNDED / 2026</span><div class="collector-band">${r.cost>8772?'NEXT UNLOCK':'REWARD PASS'}<b>90 DAYS</b></div><div class="collector-footer"><strong>${r.variable?'From ':''}${fmt(r.cost)}<small>POINTS</small></strong><span class="barcode" aria-hidden="true"></span></div><span class="foil"></span></div>`;}
 
-function detail(){const r=rewards[state.selected];return `<span class="eyebrow">COLLECTION / 0${state.selected+1}</span>${pill(r.cost>8772?'Insufficient Points':'Available')}<h2>${r.name}</h2><p>${r.description}</p><div class="reward-cost"><strong>${r.variable?'From ':''}${fmt(r.cost)}</strong><span>Orion Points</span></div><span class="reward-validity">${r.detail}</span><button class="btn primary" data-reward="${r.id}">${icon(r.cost>8772?'lock-keyhole':'scan')} ${r.cost>8772?'1,228 more needed':'Inspect & reveal'}</button><div class="detail-actions"><button class="text-button" data-action="flip">${icon('rotate-3d')}Turn card</button><button class="text-button" data-pin="${r.id}" aria-pressed="${favorites.has(r.id)}">${icon('bookmark')}${favorites.has(r.id)?'Pinned':'Pin reward'}</button></div>`;}
-function storeView(){return head('ORION / THE COLLECTION','Reward Store','Seven rewards. Find the next one worth working towards.',`<button class="btn" data-action="wallet">${icon('wallet')}8,772 Points</button>`)+`<section class="collection"><div class="collection-top"><span class="eyebrow">INTERACTIVE COLLECTION</span><span>${icon('move-3d')}Drag to browse · Click to turn</span><button class="icon-button" data-action="reset-camera" aria-label="Reset card view">${icon('rotate-ccw')}</button></div><div class="collection-main"><div class="deck-column"><div id="collection-canvas" class="collection-canvas" tabindex="0" role="group" aria-label="3D reward collection. Arrow keys browse; Enter turns the card."><div class="canvas-fallback">${collector(rewards[state.selected])}</div></div><div class="deck-controls"><button class="icon-button" data-next="-1" aria-label="Previous reward">${icon('chevron-left')}</button><span data-card-counter>0${state.selected+1} <b>/ 07</b></span><button class="icon-button" data-next="1" aria-label="Next reward">${icon('chevron-right')}</button></div></div><div class="reward-detail" aria-live="polite">${detail()}</div></div><div class="reward-rail">${rewards.map((r,i)=>`<button data-select="${i}" aria-pressed="${i===state.selected}" class="${i===state.selected?'active':''}"><span class="rail-emblem">${icon(r.id==='labs'?'scan':r.variable?'clock-3':'ticket')}</span><span><strong>${r.value}</strong><small>${r.variable?'From ':''}${fmt(r.cost)} PTS</small></span>${r.cost>8772?icon('lock-keyhole'):''}</button>`).join('')}</div></section><p class="store-rule">${icon('info')}${storeRules}</p><div class="section-head collection-heading"><div><span class="eyebrow">YOUR REWARD LOADOUT</span><h2>Explore every reward</h2></div><span class="pill">7 rewards</span></div><div class="collector-grid-list">${rewards.map(r=>`<article class="reward-item"><button class="reward-tile" data-reward="${r.id}" aria-label="Inspect ${r.name}">${collector(r)}</button><div class="reward-item-label"><span>${r.name}</span><button data-pin="${r.id}" class="icon-button" aria-label="Pin ${r.name}" aria-pressed="${favorites.has(r.id)}">${icon('bookmark')}</button></div></article>`).join('')}</div><div class="spend-grid"><section class="panel"><div class="section-head"><h2>Points also pay part of these</h2>${icon('ticket')}</div>${[['New account','any model or size · up to 20% of the price','Buy account'],['Evaluation reset','25% of the list price · Points up to 20%','Reset #241120'],['Retry credit','same model and size · Points up to 50% · within 30 days of a breach','']].map(([a,b,c])=>`<div class="spend-row"><div><h3>${a}</h3><p>${b}</p></div>${c?`<button class="btn small" data-action="wallet">${c}</button>`:'<small>No active retry credit</small>'}</div>`).join('')}</section><section class="panel voucher-empty"><span class="eyebrow">YOUR INVENTORY</span><h2>Your vouchers <small>0 active</small></h2><div class="voucher-slot">${icon('ticket-check')}</div><h3>No vouchers yet</h3><p>Redeem a perk and its code will appear here.</p></section></div>`;}
-function selectReward(i){state.selected=(Number(i)+7)%7;scene?.select(state.selected);if($('.reward-detail'))$('.reward-detail').innerHTML=detail();$$('[data-select]').forEach(b=>{b.classList.toggle('active',Number(b.dataset.select)===state.selected);b.setAttribute('aria-pressed',String(Number(b.dataset.select)===state.selected));});if($('[data-card-counter]'))$('[data-card-counter]').innerHTML=`0${state.selected+1} <b>/ 07</b>`;if($('.canvas-fallback'))$('.canvas-fallback').innerHTML=collector(rewards[state.selected]);hydrate();tone();}
-function pin(id){favorites.has(id)?favorites.delete(id):favorites.add(id);try{localStorage.setItem('orion-blue-pins',JSON.stringify([...favorites]));}catch{notify('Pin saved for this visit only.');}$$(`[data-pin="${id}"]`).forEach(b=>{b.setAttribute('aria-pressed',String(favorites.has(id)));if(b.closest('.detail-actions'))b.innerHTML=icon('bookmark')+(favorites.has(id)?'Pinned':'Pin reward');});hydrate();tone();}
-function inspect(id){const r=rewards.find(r=>r.id===id);if(!r)return;revealReward=r;show(`<div class="inspect-layout"><div class="inspect-stage" id="inspect-canvas" tabindex="0" role="group" aria-label="Rotate reward card by dragging. Arrow keys rotate; Enter flips."><div class="canvas-fallback">${collector(r)}</div></div><div class="inspect-copy"><span class="eyebrow">ORION / REWARD PASS</span>${pill(r.cost>8772?'Insufficient Points':'Available')}<h2 id="dialog-title">${r.name}</h2><p>${r.description}</p><div class="reward-cost"><strong>${r.variable?'From ':''}${fmt(r.cost)}</strong><span>Points</span></div><p>${r.detail}</p>${r.cost>8772?'<div class="lock-gap">1,228 more needed<span>8,772 / 10,000 Points</span></div><p>Converting part of your $4,200.00 payout would get you there.</p><span class="pill">First payout: +1,000</span>':'<button class="btn primary" data-action="pack">'+icon('fingerprint')+'Open reward preview</button>'}<div class="inspect-controls"><button class="text-button" data-action="inspect-flip">${icon('rotate-3d')}Read the back</button><button class="text-button" data-action="layers" aria-pressed="false">${icon('layers-3')}Separate layers</button></div><div class="reward-use"><span>01 / EARN</span><p>Purchases, evaluation milestones and promotions add Points to your balance.</p><span>02 / USE</span><p>${r.id==='labs'?'Redeem this access pass to explore Orion Labs before public release.':r.variable?'Choose an eligible account when redeeming. Pricing depends on account size.':'Redeem this voucher, then apply its code at checkout within the Points limit.'}</p></div><p class="small-note">A reward pass shows what you get, its Points cost and its validity. Preview only; your Points remain unchanged.</p></div></div>`,'inspect-dialog');mountModalScene(r);}
-async function mountModalScene(r){const e=modalEpoch,h=$('#inspect-canvas');if(!h)return;const s=await mountCollection(h,rewards,rewards.indexOf(r),()=>{},{single:true,reduced:state.reduced});if(e!==modalEpoch)s?.dispose();else{modalScene=s;if(!s)h.dataset.render='fallback';}}
-function pack(){const r=revealReward;charge=0;holding=false;show(`<div class="pack-view"><div class="reveal-path"><span>01 / SELECTED</span><b>02 / UNLOCK</b><span>03 / REVEAL</span></div><span class="eyebrow">YOUR SELECTED REWARD</span><h2 id="dialog-title">${r.name}</h2><div class="sealed-pack vault-pack"><div class="vault-orbit"></div><div class="vault-lid"><img src="assets/blue/vault.png" alt="" width="1254" height="1254"></div><div class="vault-base"><img src="assets/blue/vault.png" alt="Black titanium Orion reward vault" width="1254" height="1254"></div><div class="vault-beam"></div><div class="vault-pass">${passInterior(r)}</div><div class="vault-caption"><span>SELECTED REWARD / SECURED</span><strong>${r.variable?'FROM ':''}${fmt(r.cost)} POINTS</strong></div></div><button class="hold-control" data-hold><span></span>${icon('fingerprint')}<b>Hold to unlock</b><strong data-charge>0%</strong></button><button class="text-button instant" data-action="reveal-now">Reveal instantly</button><p class="small-note">Hold or use Space. Selected reward; no random outcome.</p><p class="preview-caption">PREVIEW ONLY · NO POINTS SPENT</p></div>`,'pack-dialog');const h=$('[data-hold]');const up=()=>holding=false;h.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();h.focus();h.setPointerCapture(e.pointerId);holding=true;tone();});h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);h.addEventListener('blur',up);h.addEventListener('keydown',e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();holding=true;}});h.addEventListener('keyup',up);let last=0;const e=modalEpoch;function frame(t){if(e!==modalEpoch)return;const d=Math.min(t-(last||t),60);last=t;charge=Math.max(0,Math.min(1,charge+(holding?d/1250:-d/2000)));h.style.setProperty('--charge',charge);$('.sealed-pack').style.setProperty('--charge',charge);$('[data-charge]').textContent=Math.round(charge*100)+'%';if(charge===1){reveal(false);return;}holdFrame=requestAnimationFrame(frame);}holdFrame=requestAnimationFrame(frame);}
-function reveal(instant=false){holding=false;cancelAnimationFrame(holdFrame);const e=modalEpoch;$('.sealed-pack')?.classList.add('unsealed');$('[data-hold]')?.setAttribute('disabled','');tone(true);setTimeout(()=>{if(e!==modalEpoch)return;const r=revealReward;show(`<div class="revealed"><div class="reveal-path"><span>01 / SELECTED</span><span>02 / UNLOCKED</span><b>03 / REVEALED</b></div><span class="eyebrow">YOUR REWARD PREVIEW</span><h2 id="dialog-title">${r.name}</h2><div class="revealed-card">${collector(r)}</div><strong class="reveal-price">${r.variable?'From ':''}${fmt(r.cost)} <span>Points</span></strong><p>${r.description}</p><span>${r.detail}</span><div class="reveal-actions"><button class="btn primary" data-action="close">Back to collection</button><button class="btn" data-action="pack">Replay reveal</button></div><p class="small-note">No voucher issued. Your Points balance remains 8,772.</p></div>`,'pack-dialog');setupTilts();},instant||state.reduced?20:1750);}
+let modalScene=null,holdFrame=null,holding=false,charge=0,revealReward=null,milestoneTimer=null,milestoneStep=0;
+let favorites=new Set();try{favorites=new Set(JSON.parse(localStorage.getItem('orion-blue-pins')||'[]'));}catch{}
+
+const workspace=createWorkspace({show,notify,tone,onChange:updateProgress});
+function updateProgress(){
+  const s=workspace?.summary();
+  if(!s)return;
+  $$('.mission[data-tool]').forEach(el=>{
+    const done=el.dataset.tool==='session'?s.prepared:el.dataset.tool==='risk'?s.risk:s.reviews>0;
+    el.classList.toggle('done',done);
+    el.querySelector('.mission-check').innerHTML=icon(done?'circle-check':'plus');
+  });
+  hydrate();
+}
+
+function collector(r,back=false){
+  return `<div class="collector ${back?'back':''}" style="--variant:${rewards.indexOf(r)}"><div class="collector-rim"></div><div class="collector-top"><span>ORION <b>/ REWARDS</b></span><small>0${rewards.indexOf(r)+1}/07</small></div>${passInterior(r)}<span class="collector-side">ORION FUNDED / 2026</span><div class="collector-band">${r.cost>8772?'NEXT UNLOCK':'REWARD PASS'}<b>90 DAYS</b></div><div class="collector-footer"><strong>${r.variable?'From ':''}${fmt(r.cost)}<small>POINTS</small></strong><span class="barcode" aria-hidden="true"></span></div><span class="foil"></span></div>`;
+}
+
+function detail(){
+  const r=rewards[state.selected];
+  const st=rewardStats[r.id]||{rarity:'RARE'};
+  return `<span class="eyebrow">COLLECTION / 0${state.selected+1} · ${st.rarity}</span>${pill(r.cost>8772?'Insufficient Points':'Available')}<h2>${r.name}</h2><p>${r.description}</p><div class="reward-cost"><strong>${r.variable?'From ':''}${fmt(r.cost)}</strong><span>Orion Points</span></div><span class="reward-validity">${r.detail}</span><button class="btn primary" data-reward="${r.id}">${icon(r.cost>8772?'lock-keyhole':'scan')} ${r.cost>8772?'1,228 more needed':'Inspect & reveal'}</button><div class="detail-actions"><button class="text-button" data-action="flip">${icon('rotate-3d')}Turn card</button><button class="text-button" data-pin="${r.id}" aria-pressed="${favorites.has(r.id)}">${icon('bookmark')}${favorites.has(r.id)?'Pinned':'Pin reward'}</button></div>`;
+}
+
+function storeView(){
+  const filteredRewards = rewards.filter(r => {
+    if (state.rarityFilter === 'ALL') return true;
+    const st = rewardStats[r.id];
+    return st?.rarity === state.rarityFilter;
+  });
+
+  return head('ORION / THE COLLECTION','Reward Store','Seven rewards. Find the next one worth working towards.',`<button class="btn" data-action="wallet">${icon('wallet')}8,772 Points</button>`)+
+  `<section class="collection"><div class="collection-top"><span class="eyebrow">INTERACTIVE COLLECTION</span><span>${icon('move-3d')}Drag to browse · Click to turn</span><button class="icon-button" data-action="reset-camera" aria-label="Reset card view">${icon('rotate-ccw')}</button></div><div class="collection-main"><div class="deck-column"><div id="collection-canvas" class="collection-canvas" tabindex="0" role="group" aria-label="3D reward collection. Arrow keys browse; Enter turns the card."><div class="canvas-fallback">${collector(rewards[state.selected])}</div></div><div class="deck-controls"><button class="icon-button" data-next="-1" aria-label="Previous reward">${icon('chevron-left')}</button><span data-card-counter>0${state.selected+1} <b>/ 07</b></span><button class="icon-button" data-next="1" aria-label="Next reward">${icon('chevron-right')}</button></div></div><div class="reward-detail" aria-live="polite">${detail()}</div></div><div class="reward-rail">${rewards.map((r,i)=>`<button data-select="${i}" aria-pressed="${i===state.selected}" class="${i===state.selected?'active':''}"><span class="rail-emblem">${icon(r.id==='labs'?'scan':r.variable?'clock-3':'ticket')}</span><span><strong>${r.value}</strong><small>${r.variable?'From ':''}${fmt(r.cost)} PTS</small></span>${r.cost>8772?icon('lock-keyhole'):''}</button>`).join('')}</div></section><p class="store-rule">${icon('info')}${storeRules}</p><div class="section-head collection-heading"><div><span class="eyebrow">YOUR REWARD LOADOUT</span><h2>Explore every reward</h2></div><span class="pill">7 rewards</span></div><div class="filter-tabs" style="margin-bottom: 22px;">${['ALL','COMMON','UNCOMMON','RARE','EPIC','LEGENDARY','MYSTERY DROP'].map(rf=>`<button data-rarity="${rf}" class="${state.rarityFilter===rf?'active':''}">${rf}</button>`).join('')}</div><div class="collector-grid-list">${filteredRewards.map(r=>`<article class="reward-item"><button class="reward-tile" data-reward="${r.id}" aria-label="Inspect ${r.name}">${collector(r)}</button><div class="reward-item-label"><span>${r.name}</span><button data-pin="${r.id}" class="icon-button" aria-label="Pin ${r.name}" aria-pressed="${favorites.has(r.id)}">${icon('bookmark')}</button></div></article>`).join('')}</div><div class="spend-grid"><section class="panel"><div class="section-head"><h2>Points also pay part of these</h2>${icon('ticket')}</div>${[['New account','any model or size · up to 20% of the price','Buy account'],['Evaluation reset','25% of the list price · Points up to 20%','Reset #241120'],['Retry credit','same model and size · Points up to 50% · within 30 days of a breach','']].map(([a,b,c])=>`<div class="spend-row"><div><h3>${a}</h3><p>${b}</p></div>${c?`<button class="btn small" data-action="wallet">${c}</button>`:'<small>No active retry credit</small>'}</div>`).join('')}</section><section class="panel voucher-empty"><span class="eyebrow">YOUR INVENTORY</span><h2>Your vouchers <small>0 active</small></h2><div class="voucher-slot">${icon('ticket-check')}</div><h3>No vouchers yet</h3><p>Redeem a perk and its code will appear here.</p></section></div>`;
+}
+
+function selectReward(i){
+  state.selected=(Number(i)+7)%7;
+  scene?.select(state.selected);
+  if($('.reward-detail'))$('.reward-detail').innerHTML=detail();
+  $$('[data-select]').forEach(b=>{
+    b.classList.toggle('active',Number(b.dataset.select)===state.selected);
+    b.setAttribute('aria-pressed',String(Number(b.dataset.select)===state.selected));
+  });
+  if($('[data-card-counter]'))$('[data-card-counter]').innerHTML=`0${state.selected+1} <b>/ 07</b>`;
+  if($('.canvas-fallback'))$('.canvas-fallback').innerHTML=collector(rewards[state.selected]);
+  hydrate();
+  tone('hover');
+}
+
+function pin(id){
+  favorites.has(id)?favorites.delete(id):favorites.add(id);
+  try{localStorage.setItem('orion-blue-pins',JSON.stringify([...favorites]));}catch{notify('Pin saved for this visit only.');}
+  $$(`[data-pin="${id}"]`).forEach(b=>{
+    b.setAttribute('aria-pressed',String(favorites.has(id)));
+    if(b.closest('.detail-actions'))b.innerHTML=icon('bookmark')+(favorites.has(id)?'Pinned':'Pin reward');
+  });
+  hydrate();
+  tone('click');
+}
+
+function inspect(id){
+  const r=rewards.find(r=>r.id===id);
+  if(!r)return;
+  revealReward=r;
+  const st=rewardStats[r.id]||{rarity:'RARE'};
+  show(`<div class="inspect-layout"><div class="inspect-stage" id="inspect-canvas" tabindex="0" role="group" aria-label="Rotate reward card by dragging. Arrow keys rotate; Enter flips."><div class="canvas-fallback">${collector(r)}</div></div><div class="inspect-copy"><span class="eyebrow">ORION / REWARD PASS · ${st.rarity}</span>${pill(r.cost>8772?'Insufficient Points':'Available')}<h2 id="dialog-title">${r.name}</h2><p>${r.description}</p><div class="reward-cost"><strong>${r.variable?'From ':''}${fmt(r.cost)}</strong><span>Points</span></div><p>${r.detail}</p>${r.cost>8772?'<div class="lock-gap">1,228 more needed<span>8,772 / 10,000 Points</span></div><p>Converting part of your $4,200.00 payout would get you there.</p><span class="pill">First payout: +1,000</span>':'<button class="btn primary" data-action="pack">'+icon('fingerprint')+'Open reward preview</button>'}<div class="inspect-controls"><button class="text-button" data-action="inspect-flip">${icon('rotate-3d')}Read the back</button><button class="text-button" data-action="layers" aria-pressed="false">${icon('layers-3')}Separate layers</button></div><div class="reward-use"><span>01 / EARN</span><p>Purchases, evaluation milestones and promotions add Points to your balance.</p><span>02 / USE</span><p>${r.id==='labs'?'Redeem this access pass to explore Orion Labs before public release.':r.variable?'Choose an eligible account when redeeming. Pricing depends on account size.':'Redeem this voucher, then apply its code at checkout within the Points limit.'}</p></div><p class="small-note">A reward pass shows what you get, its Points cost and its validity. Preview only; your Points remain unchanged.</p></div></div>`,'inspect-dialog');
+  mountModalScene(r);
+  tone('click');
+}
+
+async function mountModalScene(r){
+  const e=modalEpoch,h=$('#inspect-canvas');
+  if(!h)return;
+  const s=await mountCollection(h,rewards,rewards.indexOf(r),()=>{},{single:true,reduced:state.reduced});
+  if(e!==modalEpoch)s?.dispose();
+  else{modalScene=s;if(!s)h.dataset.render='fallback';}
+}
+
+function pack(){
+  const r=revealReward;
+  charge=0;holding=false;
+  show(`<div class="pack-view"><div class="reveal-path"><span>01 / SELECTED</span><b>02 / UNLOCK</b><span>03 / REVEAL</span></div><span class="eyebrow">YOUR SELECTED REWARD</span><h2 id="dialog-title">${r.name}</h2><div class="sealed-pack vault-pack"><div class="vault-orbit"></div><div class="vault-lid"><img src="assets/blue/vault.png" alt="" width="1254" height="1254"></div><div class="vault-base"><img src="assets/blue/vault.png" alt="Black titanium Orion reward vault" width="1254" height="1254"></div><div class="vault-beam"></div><div class="vault-pass">${passInterior(r)}</div><div class="vault-caption"><span>SELECTED REWARD / SECURED</span><strong>${r.variable?'FROM ':''}${fmt(r.cost)} POINTS</strong></div></div><button class="hold-control" data-hold><span></span>${icon('fingerprint')}<b>Hold to unlock</b><strong data-charge>0%</strong></button><button class="text-button instant" data-action="reveal-now">Reveal instantly</button><p class="small-note">Hold or use Space. Selected reward; no random outcome.</p><p class="preview-caption">PREVIEW ONLY · NO POINTS SPENT</p></div>`,'pack-dialog');
+  
+  const h=$('[data-hold]');
+  const up=()=>holding=false;
+  h.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();h.focus();h.setPointerCapture(e.pointerId);holding=true;tone('click');});
+  h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);h.addEventListener('blur',up);
+  h.addEventListener('keydown',e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();holding=true;}});
+  h.addEventListener('keyup',up);
+
+  let last=0;const e=modalEpoch;
+  function frame(t){
+    if(e!==modalEpoch)return;
+    const d=Math.min(t-(last||t),60);
+    last=t;
+    charge=Math.max(0,Math.min(1,charge+(holding?d/1250:-d/2000)));
+    h.style.setProperty('--charge',charge);
+    if($('.sealed-pack'))$('.sealed-pack').style.setProperty('--charge',charge);
+    if($('[data-charge]'))$('[data-charge]').textContent=Math.round(charge*100)+'%';
+    if(charge===1){reveal(false);return;}
+    holdFrame=requestAnimationFrame(frame);
+  }
+  holdFrame=requestAnimationFrame(frame);
+}
+
+function reveal(instant=false){
+  holding=false;cancelAnimationFrame(holdFrame);
+  const e=modalEpoch;
+  $('.sealed-pack')?.classList.add('unsealed');
+  $('[data-hold]')?.setAttribute('disabled','');
+  tone('unlock');
+  setTimeout(()=>{
+    if(e!==modalEpoch)return;
+    const r=revealReward;
+    show(`<div class="revealed"><div class="reveal-path"><span>01 / SELECTED</span><span>02 / UNLOCKED</span><b>03 / REVEALED</b></div><span class="eyebrow">YOUR REWARD PREVIEW</span><h2 id="dialog-title">${r.name}</h2><div class="revealed-card">${collector(r)}</div><strong class="reveal-price">${r.variable?'From ':''}${fmt(r.cost)} <span>Points</span></strong><p>${r.description}</p><span>${r.detail}</span><div class="reveal-actions"><button class="btn primary" data-action="close">Back to collection</button><button class="btn" data-action="pack">Replay reveal</button></div><p class="small-note">No voucher issued. Your Points balance remains 8,772.</p></div>`,'pack-dialog');
+    setupTilts();
+  },instant||state.reduced?20:1750);
+}
+
 const filters=['All','Earned','Redeemed','Pending','Expiring','Reversed'];
 function filterRows(f=state.filter){return activities.filter(a=>f==='All'||f==='Earned'&&['Available','Expiring soon'].includes(a.status)||f==='Pending'&&a.status==='Pending'||f==='Expiring'&&a.status==='Expiring soon'||f==='Reversed'&&a.status==='Reversed');}
 function shownRows(){return filterRows().filter(a=>(a.name+' '+a.ref+' '+a.date).toLowerCase().includes(state.query.toLowerCase()));}
-function ledger(){const rows=shownRows();if(!rows.length)return `<div class="empty"><span>${icon('scan-line')}</span><h3>${state.filter==='Redeemed'?'No redeemed Points yet':'No matching activity'}</h3><p>${state.filter==='Redeemed'?'Your redemptions will appear here.':'Try another search or filter.'}</p></div>`;if(state.mode==='table')return `<div class="table-scroll"><table><thead><tr><th>Description</th><th>Date</th><th>Points</th><th>Status</th><th>Expires</th></tr></thead><tbody>${rows.map(a=>`<tr><td><button data-event="${activities.indexOf(a)}">${a.name}<small>${a.ref}</small></button></td><td>${a.date}</td><td class="${a.points<0?'negative':'positive'}">${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}</td><td>${pill(a.status)}</td><td>${a.expires}</td></tr>`).join('')}</tbody></table></div>`;return `<div class="timeline">${rows.map((a,i)=>`<button class="timeline-event" data-event="${activities.indexOf(a)}" style="--i:${i}"><div class="event-date"><strong>${a.date.split(' ')[1].replace(',','')}</strong><span>${a.date.split(' ')[0]} ${a.date.split(' ')[2]}</span></div><span class="event-node">${icon(a.icon==='cart'?'shopping-bag':a.icon==='flag'?'flag':a.icon==='award'?'trophy':a.icon==='alert'?'rotate-ccw':'gift')}</span><div class="event-body"><div class="event-meta"><span>${a.ref}</span>${pill(a.status)}</div><h3>${a.name}</h3><div class="event-bottom"><span>Expires ${a.expires}</span><b class="${a.points<0?'negative':'positive'}">${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}<small>PTS</small></b></div></div></button>`).join('')}</div>`;}
-function activity(){return head('YOUR POINTS / MISSION LOG','Activity','Every purchase, milestone and reward, in one place.',`<button class="btn" data-action="export">${icon('download')}Export activity</button>`)+`<section class="activity-command"><div class="activity-total"><span class="eyebrow">TOTAL EARNED</span><strong>9,715 <span>Points</span></strong><div class="record-wave" aria-hidden="true">${activities.slice().reverse().map((a,i)=>`<i style="--h:${12+Math.sqrt(Math.abs(a.points)/5000)*65}px;--i:${i}"></i>`).join('')}</div></div><div class="command-stat"><span>Pending</span><strong>943</strong><small>Clears Sep 30, 2026</small></div><div class="command-stat"><span>Redeemed</span><strong>0</strong><small>Nothing expired unused</small></div><button class="activity-journal" data-tool="journal"><span class="blue-icon">${icon('notebook-pen')}</span><strong>Trade review journal</strong><span>Open your local workspace</span></button></section><div class="activity-controls"><div class="filter-tabs" aria-label="Filter Points activity">${filters.map(f=>`<button data-filter="${f}" class="${f===state.filter?'active':''}" aria-pressed="${f===state.filter}">${f}<b>${filterRows(f).length}</b></button>`).join('')}</div><div class="mode-toggle"><button data-mode="timeline" aria-pressed="${state.mode==='timeline'}" aria-label="Timeline view">${icon('git-commit-horizontal')}</button><button data-mode="table" aria-pressed="${state.mode==='table'}" aria-label="Table view">${icon('list')}</button></div></div><div class="log-layout"><section><label class="search-box">${icon('search')}<input type="search" placeholder="Find an account or milestone" aria-label="Search Points activity" value="${esc(state.query)}" id="activity-search"></label><div id="ledger">${ledger()}</div></section><aside class="expiry-console"><div class="section-head"><span class="eyebrow">EXPIRY WATCH</span>${icon('radar')}</div><div class="expiry-dial"><strong>17</strong><span>DAYS LEFT</span></div><h2>5,943 <span>Points</span></h2><p>Use before October 12, 2026.<br>Worth $59.43 on your next account.</p><a href="#store" class="btn primary">Explore rewards</a><small>Oldest Points are used first.</small><div class="expiry-list"><h3>Upcoming expiries</h3>${[['Oct 12, 2026','5,943'],['Oct 27, 2026','314'],['Nov 4, 2026','629']].map(([d,v])=>`<div><span>${d}</span><b>${v}</b></div>`).join('')}</div></aside></div><details class="batch-panel"><summary>Points batches and expiry dates ${icon('chevron-down')}</summary>${activities.filter(a=>a.status!=='Reversed').sort((a,b)=>new Date(a.expires)-new Date(b.expires)).map(a=>`<div><span>${a.name}<small>${a.ref}</small></span><b>${fmt(a.points)} Points</b><time>${a.expires}</time>${pill(a.status)}</div>`).join('')}</details><p class="store-rule">${icon('shield-check')}${loyaltyRule}</p>`;}
+
+function ledger(){
+  const rows=shownRows();
+  if(!rows.length)return `<div class="empty"><span>${icon('scan-line')}</span><h3>${state.filter==='Redeemed'?'No redeemed Points yet':'No matching activity'}</h3><p>${state.filter==='Redeemed'?'Your redemptions will appear here.':'Try another search or filter.'}</p></div>`;
+  if(state.mode==='table')return `<div class="table-scroll"><table><thead><tr><th>Description</th><th>Date</th><th>Points</th><th>Status</th><th>Expires</th></tr></thead><tbody>${rows.map(a=>`<tr><td><button data-event="${activities.indexOf(a)}">${a.name}<small>${a.ref}</small></button></td><td>${a.date}</td><td class="${a.points<0?'negative':'positive'}">${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}</td><td>${pill(a.status)}</td><td>${a.expires}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="timeline">${rows.map((a,i)=>`<button class="timeline-event" data-event="${activities.indexOf(a)}" style="--i:${i}"><div class="event-date"><strong>${a.date.split(' ')[1].replace(',','')}</strong><span>${a.date.split(' ')[0]} ${a.date.split(' ')[2]}</span></div><span class="event-node">${icon(a.icon==='cart'?'shopping-bag':a.icon==='flag'?'flag':a.icon==='award'?'trophy':a.icon==='alert'?'rotate-ccw':'gift')}</span><div class="event-body"><div class="event-meta"><span>${a.ref}</span>${pill(a.status)}</div><h3>${a.name}</h3><div class="event-bottom"><span>Expires ${a.expires}</span><b class="${a.points<0?'negative':'positive'}">${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}<small>PTS</small></b></div></div></button>`).join('')}</div>`;
+}
+
+function activity(){
+  return head('YOUR POINTS / MISSION LOG','Activity','Every purchase, milestone and reward, in one place.',`<button class="btn" data-action="export">${icon('download')}Export activity</button>`)+
+  `<section class="activity-command"><div class="activity-total"><span class="eyebrow">TOTAL EARNED</span><strong>9,715 <span>Points</span></strong><div class="record-wave" aria-hidden="true">${activities.slice().reverse().map((a,i)=>`<i style="--h:${12+Math.sqrt(Math.abs(a.points)/5000)*65}px;--i:${i}"></i>`).join('')}</div></div><div class="command-stat"><span>Pending</span><strong>943</strong><small>Clears Sep 30, 2026</small></div><div class="command-stat"><span>Redeemed</span><strong>0</strong><small>Nothing expired unused</small></div><button class="activity-journal" data-tool="journal"><span class="blue-icon">${icon('notebook-pen')}</span><strong>Trade review journal</strong><span>Open your local workspace</span></button></section><div class="activity-controls"><div class="filter-tabs" aria-label="Filter Points activity">${filters.map(f=>`<button data-filter="${f}" class="${f===state.filter?'active':''}" aria-pressed="${f===state.filter}">${f}<b>${filterRows(f).length}</b></button>`).join('')}</div><div class="mode-toggle"><button data-mode="timeline" aria-pressed="${state.mode==='timeline'}" aria-label="Timeline view">${icon('git-commit-horizontal')}</button><button data-mode="table" aria-pressed="${state.mode==='table'}" aria-label="Table view">${icon('list')}</button></div></div><div class="log-layout"><section><label class="search-box">${icon('search')}<input type="search" placeholder="Find an account or milestone" aria-label="Search Points activity" value="${esc(state.query)}" id="activity-search"></label><div id="ledger">${ledger()}</div></section><aside class="expiry-console"><div class="section-head"><span class="eyebrow">EXPIRY WATCH</span>${icon('radar')}</div><div class="expiry-dial"><strong>17</strong><span>DAYS LEFT</span></div><h2>5,943 <span>Points</span></h2><p>Use before October 12, 2026.<br>Worth $59.43 on your next account.</p><a href="#store" class="btn primary">Explore rewards</a><small>Oldest Points are used first.</small><div class="expiry-list"><h3>Upcoming expiries</h3>${[['Oct 12, 2026','5,943'],['Oct 27, 2026','314'],['Nov 4, 2026','629']].map(([d,v])=>`<div><span>${d}</span><b>${v}</b></div>`).join('')}</div></aside></div><details class="batch-panel"><summary>Points batches and expiry dates ${icon('chevron-down')}</summary>${activities.filter(a=>a.status!=='Reversed').sort((a,b)=>new Date(a.expires)-new Date(b.expires)).map(a=>`<div><span>${a.name}<small>${a.ref}</small></span><b>${fmt(a.points)} Points</b><time>${a.expires}</time>${pill(a.status)}</div>`).join('')}</details><p class="store-rule">${icon('shield-check')}${loyaltyRule}</p>`;
+}
+
 function eventDetail(i){const a=activities[i];show(`<span class="eyebrow">POINTS ACTIVITY / RECORD ${String(i+1).padStart(2,'0')}</span><h2 id="dialog-title">${a.name}</h2><strong class="event-big ${a.points<0?'negative':'positive'}">${a.points<0?'−':'+'}${fmt(Math.abs(a.points))}<span>Points</span></strong><dl class="event-facts"><div><dt>Reference</dt><dd>${a.ref}</dd></div><div><dt>Date</dt><dd>${a.date}</dd></div><div><dt>Status</dt><dd>${pill(a.status)}</dd></div><div><dt>Expires</dt><dd>${a.expires}</dd></div></dl><button class="btn primary" data-action="close">Back to activity</button>`);}
 function milestoneRows(){return activities.filter(a=>a.ref==='Account #'+state.account).slice().reverse();}
-function milestones(){const rows=milestoneRows();milestoneStep=Math.min(milestoneStep,rows.length-1);const a=rows[milestoneStep];show(`<div class="milestone-view"><span class="eyebrow">YOUR RECORDED PROGRESS</span><h2 id="dialog-title">Milestone replay</h2><div class="account-switch">${['220687','158984','241120'].map(id=>`<button data-account="${id}" aria-pressed="${state.account===id}">#${id}</button>`).join('')}</div><div class="milestone-stage"><img src="assets/blue/crystal.png" width="1254" height="1254" alt="Orion Points crystal"><div><span class="eyebrow" data-ms-date>${a.date}</span><h3 data-ms-title>${a.name}</h3><strong data-ms-points>+${fmt(a.points)} <span>Points</span></strong><span data-ms-status>${pill(a.status)}</span><p data-ms-expiry>Expires ${a.expires}</p></div></div><div class="milestone-track">${rows.map((a,i)=>`<button data-ms="${i}" aria-pressed="${milestoneStep===i}"><b>0${i+1}</b><span>${a.name.split(' — ')[0]}</span></button>`).join('')}</div><label class="milestone-slider">Explore history<input type="range" data-scrub min="0" max="${rows.length-1}" step="1" value="${milestoneStep}" aria-label="Explore account milestone" ${rows.length===1?'disabled':''}></label><button class="btn primary" data-action="replay-milestones">${icon('play')}Replay journey</button><p class="small-note">Recorded history. Replaying does not award new Points.</p></div>`,'workspace-dialog');}
-function stepMilestone(i){const rows=milestoneRows();milestoneStep=Math.max(0,Math.min(Number(i),rows.length-1));const a=rows[milestoneStep];if(!$('[data-ms-title]'))return;$('[data-ms-title]').textContent=a.name;$('[data-ms-date]').textContent=a.date;$('[data-ms-points]').innerHTML=`+${fmt(a.points)} <span>Points</span>`;$('[data-ms-status]').innerHTML=pill(a.status);$('[data-ms-expiry]').textContent='Expires '+a.expires;$('[data-scrub]').value=milestoneStep;$$('[data-ms]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.ms)===milestoneStep)));tone();}
-function exportActivity(){const csv=[['Description','Reference','Date','Points','Status','Expires'],...shownRows().map(a=>[a.name,a.ref,a.date,a.points,a.status,a.expires])].map(row=>row.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),a=document.createElement('a');a.href=url;a.download='orion-points-activity.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Activity export prepared.');}
-function setupTilts(){const els=$$('.reward-tile,.revealed-card,.arena-art');els.forEach(el=>{let moved=false,start=0;el.addEventListener('pointerdown',e=>{start=e.clientX;moved=false;});el.addEventListener('pointermove',e=>{if(state.reduced)return;const b=el.getBoundingClientRect(),x=(e.clientX-b.left)/b.width-.5,y=(e.clientY-b.top)/b.height-.5;el.style.setProperty('--ry',x*20+'deg');el.style.setProperty('--rx',-y*14+'deg');el.style.setProperty('--mx',x*100+50+'%');if(e.buttons&&Math.abs(e.clientX-start)>8)moved=true;});el.addEventListener('pointerleave',()=>{el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg');});if(el.classList.contains('arena-art'))el.addEventListener('click',e=>{if(moved){e.stopPropagation();moved=false;}});});}
-async function render(){const e=++epoch;scene?.dispose();scene=null;const route=location.hash.slice(1);state.route=['overview','store','activity'].includes(route)?route:'overview';$('#view').innerHTML=`<div class="page-in">${state.route==='store'?storeView():state.route==='activity'?activity():overview()}</div>`;$$('[data-route]').forEach(b=>{const active=b.dataset.route===state.route;b.classList.toggle('active',active);active?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current');});hydrate();setupTilts();updateProgress();if(state.route==='store'){const h=$('#collection-canvas'),s=await mountCollection(h,rewards,state.selected,selectReward,{reduced:state.reduced});if(e!==epoch)s?.dispose();else{scene=s;scene?.select(state.selected);scene?.setReduced(state.reduced);if(!s)h.dataset.render='fallback';}}}
-document.addEventListener('click',e=>{if(e.target.closest('.skip')){e.preventDefault();$('#main').focus();return;}const b=e.target.closest('button,[data-action]');if(!b)return;if(workspace.click(b))return;if(b.dataset.tool){workspace.open(b.dataset.tool);return;}if(b.dataset.reward){inspect(b.dataset.reward);return;}if(b.dataset.select!==undefined){selectReward(b.dataset.select);return;}if(b.dataset.next){selectReward(state.selected+Number(b.dataset.next));return;}if(b.dataset.pin){pin(b.dataset.pin);return;}if(b.dataset.event!==undefined){eventDetail(Number(b.dataset.event));return;}if(b.dataset.filter){state.filter=b.dataset.filter;render();$(`[data-filter="${state.filter}"]`).focus({preventScroll:true});return;}if(b.dataset.mode){state.mode=b.dataset.mode;render();$(`[data-mode="${state.mode}"]`).focus({preventScroll:true});return;}if(b.dataset.account){clearInterval(milestoneTimer);state.account=b.dataset.account;milestoneStep=milestoneRows().length-1;milestones();$(`[data-account="${state.account}"]`).focus();return;}if(b.dataset.ms!==undefined){clearInterval(milestoneTimer);stepMilestone(b.dataset.ms);return;}
- switch(b.dataset.action){case'close':close();break;case'help':help();break;case'wallet':wallet();break;case'milestones':milestoneStep=milestoneRows().length-1;milestones();break;case'replay-milestones':clearInterval(milestoneTimer);stepMilestone(0);milestoneTimer=setInterval(()=>{if(milestoneStep>=milestoneRows().length-1){clearInterval(milestoneTimer);return;}stepMilestone(milestoneStep+1);},1400);break;case'export':exportActivity();break;case'flip':if(scene)scene.flip();else $('.canvas-fallback .collector')?.classList.toggle('flipped');tone();break;case'layers':{const active=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(active));modalScene?.explode(active);b.innerHTML=icon('layers-3')+(active?'Reassemble':'Separate layers');hydrate();break;}case'inspect-flip':if(modalScene)modalScene.flip();else $('#inspect-canvas .collector')?.classList.toggle('flipped');tone();break;case'reset-camera':scene?.reset();break;case'pack':pack();break;case'reveal-now':reveal(true);break;case'sound':state.sound=!state.sound;b.setAttribute('aria-pressed',String(state.sound));b.setAttribute('aria-label',state.sound?'Disable sound':'Enable sound');b.innerHTML=icon(state.sound?'volume-2':'volume-x');hydrate();tone();break;case'motion':state.reduced=!state.reduced;document.body.classList.toggle('reduce-motion',state.reduced);scene?.setReduced(state.reduced);modalScene?.setReduced(state.reduced);b.setAttribute('aria-pressed',String(state.reduced));notify(state.reduced?'Reduced motion enabled':'Full motion enabled');break;}
+
+function milestones(){
+  const rows=milestoneRows();
+  milestoneStep=Math.min(milestoneStep,rows.length-1);
+  const a=rows[milestoneStep];
+  show(`<div class="milestone-view"><span class="eyebrow">YOUR RECORDED PROGRESS</span><h2 id="dialog-title">Milestone replay</h2><div class="account-switch">${['220687','158984','241120'].map(id=>`<button data-account="${id}" aria-pressed="${state.account===id}">#${id}</button>`).join('')}</div><div class="milestone-stage"><img src="assets/blue/crystal.png" width="1254" height="1254" alt="Orion Points crystal"><div><span class="eyebrow" data-ms-date>${a.date}</span><h3 data-ms-title>${a.name}</h3><strong data-ms-points>+${fmt(a.points)} <span>Points</span></strong><span data-ms-status>${pill(a.status)}</span><p data-ms-expiry>Expires ${a.expires}</p></div></div><div class="milestone-track">${rows.map((a,i)=>`<button data-ms="${i}" aria-pressed="${milestoneStep===i}"><b>0${i+1}</b><span>${a.name.split(' — ')[0]}</span></button>`).join('')}</div><label class="milestone-slider">Explore history<input type="range" data-scrub min="0" max="${rows.length-1}" step="1" value="${milestoneStep}" aria-label="Explore account milestone" ${rows.length===1?'disabled':''}></label><button class="btn primary" data-action="replay-milestones">${icon('play')}Replay journey</button><p class="small-note">Recorded history. Replaying does not award new Points.</p></div>`,'workspace-dialog');
+}
+
+function stepMilestone(i){
+  const rows=milestoneRows();
+  milestoneStep=Math.max(0,Math.min(Number(i),rows.length-1));
+  const a=rows[milestoneStep];
+  if(!$('[data-ms-title]'))return;
+  $('[data-ms-title]').textContent=a.name;
+  $('[data-ms-date]').textContent=a.date;
+  $('[data-ms-points]').innerHTML=`+${fmt(a.points)} <span>Points</span>`;
+  $('[data-ms-status]').innerHTML=pill(a.status);
+  $('[data-ms-expiry]').textContent='Expires '+a.expires;
+  $('[data-scrub]').value=milestoneStep;
+  $$('[data-ms]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.ms)===milestoneStep)));
+  tone('click');
+}
+
+function exportActivity(){
+  const csv=[['Description','Reference','Date','Points','Status','Expires'],...shownRows().map(a=>[a.name,a.ref,a.date,a.points,a.status,a.expires])].map(row=>row.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),a=document.createElement('a');
+  a.href=url;a.download='orion-points-activity.csv';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  notify('Activity export prepared.');
+}
+
+function setupTilts(){
+  const els=$$('.reward-tile,.revealed-card,.arena-art');
+  els.forEach(el=>{
+    let moved=false,start=0;
+    el.addEventListener('pointerdown',e=>{start=e.clientX;moved=false;});
+    el.addEventListener('pointermove',e=>{
+      if(state.reduced)return;
+      const b=el.getBoundingClientRect(),x=(e.clientX-b.left)/b.width-.5,y=(e.clientY-b.top)/b.height-.5;
+      el.style.setProperty('--ry',x*20+'deg');
+      el.style.setProperty('--rx',-y*14+'deg');
+      el.style.setProperty('--mx',x*100+50+'%');
+      if(e.buttons&&Math.abs(e.clientX-start)>8)moved=true;
+    });
+    el.addEventListener('pointerleave',()=>{el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg');});
+    if(el.classList.contains('arena-art'))el.addEventListener('click',e=>{if(moved){e.stopPropagation();moved=false;}});
+  });
+}
+
+async function render(){
+  const e=++epoch;
+  scene?.dispose();scene=null;
+  const route=location.hash.slice(1);
+  state.route=['overview','store','activity'].includes(route)?route:'overview';
+  $('#view').innerHTML=`<div class="page-in">${state.route==='store'?storeView():state.route==='activity'?activity():overview()}</div>`;
+  $$('[data-route]').forEach(b=>{
+    const active=b.dataset.route===state.route;
+    b.classList.toggle('active',active);
+    active?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current');
+  });
+  hydrate();
+  setupTilts();
+  updateProgress();
+
+  if(state.route==='store'){
+    const h=$('#collection-canvas'),s=await mountCollection(h,rewards,state.selected,selectReward,{reduced:state.reduced});
+    if(e!==epoch)s?.dispose();
+    else{scene=s;scene?.select(state.selected);scene?.setReduced(state.reduced);if(!s)h.dataset.render='fallback';}
+  }
+}
+
+document.addEventListener('click',e=>{
+  if(e.target.closest('.skip')){e.preventDefault();$('#main').focus();return;}
+  const b=e.target.closest('button,[data-action],[data-rarity]');
+  if(!b)return;
+
+  if(b.dataset.rarity){
+    state.rarityFilter=b.dataset.rarity;
+    render();
+    tone('click');
+    return;
+  }
+  if(workspace.click(b))return;
+  if(b.dataset.tool){workspace.open(b.dataset.tool);return;}
+  if(b.dataset.reward){inspect(b.dataset.reward);return;}
+  if(b.dataset.select!==undefined){selectReward(b.dataset.select);return;}
+  if(b.dataset.next){selectReward(state.selected+Number(b.dataset.next));return;}
+  if(b.dataset.pin){pin(b.dataset.pin);return;}
+  if(b.dataset.event!==undefined){eventDetail(Number(b.dataset.event));return;}
+  if(b.dataset.filter){state.filter=b.dataset.filter;render();$(`[data-filter="${state.filter}"]`).focus({preventScroll:true});return;}
+  if(b.dataset.mode){state.mode=b.dataset.mode;render();$(`[data-mode="${state.mode}"]`).focus({preventScroll:true});return;}
+  if(b.dataset.account){clearInterval(milestoneTimer);state.account=b.dataset.account;milestoneStep=milestoneRows().length-1;milestones();$(`[data-account="${state.account}"]`).focus();return;}
+  if(b.dataset.ms!==undefined){clearInterval(milestoneTimer);stepMilestone(b.dataset.ms);return;}
+
+  switch(b.dataset.action){
+    case'close':close();break;
+    case'help':help();break;
+    case'wallet':wallet();break;
+    case'milestones':milestoneStep=milestoneRows().length-1;milestones();break;
+    case'replay-milestones':
+      clearInterval(milestoneTimer);stepMilestone(0);
+      milestoneTimer=setInterval(()=>{
+        if(milestoneStep>=milestoneRows().length-1){clearInterval(milestoneTimer);return;}
+        stepMilestone(milestoneStep+1);
+      },1400);
+      break;
+    case'export':exportActivity();break;
+    case'flip':
+      if(scene)scene.flip();
+      else $('.canvas-fallback .collector')?.classList.toggle('flipped');
+      tone('click');
+      break;
+    case'layers':{
+      const active=b.getAttribute('aria-pressed')!=='true';
+      b.setAttribute('aria-pressed',String(active));
+      modalScene?.explode(active);
+      b.innerHTML=icon('layers-3')+(active?'Reassemble':'Separate layers');
+      hydrate();
+      tone('click');
+      break;
+    }
+    case'inspect-flip':
+      if(modalScene)modalScene.flip();
+      else $('#inspect-canvas .collector')?.classList.toggle('flipped');
+      tone('click');
+      break;
+    case'reset-camera':scene?.reset();tone('click');break;
+    case'pack':pack();break;
+    case'reveal-now':reveal(true);break;
+    case'sound':
+      state.sound=!state.sound;
+      b.setAttribute('aria-pressed',String(state.sound));
+      b.setAttribute('aria-label',state.sound?'Disable sound':'Enable sound');
+      b.innerHTML=icon(state.sound?'volume-2':'volume-x');
+      hydrate();
+      tone('click');
+      break;
+    case'motion':
+      state.reduced=!state.reduced;
+      document.body.classList.toggle('reduce-motion',state.reduced);
+      scene?.setReduced(state.reduced);
+      modalScene?.setReduced(state.reduced);
+      b.setAttribute('aria-pressed',String(state.reduced));
+      notify(state.reduced?'Reduced motion enabled':'Full motion enabled');
+      tone('click');
+      break;
+  }
 });
-document.addEventListener('input',e=>{workspace.input(e);if(e.target.id==='activity-search'){state.query=e.target.value;$('#ledger').innerHTML=ledger();hydrate();}if(e.target.matches('[data-scrub]')){clearInterval(milestoneTimer);stepMilestone(e.target.value);}});document.addEventListener('submit',e=>workspace.submit(e));
-document.addEventListener('keydown',e=>{if(e.target.matches('.arena-art')&&[' ','Enter'].includes(e.key)){e.preventDefault();milestones();}if(e.target.matches('[data-render="fallback"]')&&['ArrowRight','ArrowLeft','Enter',' '].includes(e.key)){e.preventDefault();if(e.target.id==='collection-canvas'&&['ArrowRight','ArrowLeft'].includes(e.key))selectReward(state.selected+(e.key==='ArrowRight'?1:-1));else e.target.querySelector('.collector')?.classList.toggle('flipped');}});
-$('#dialog').addEventListener('close',()=>{modalEpoch++;modalScene?.dispose();modalScene=null;cancelAnimationFrame(holdFrame);clearInterval(milestoneTimer);document.body.classList.remove('modal-open');});$('#dialog').addEventListener('click',e=>{if(e.target!==$('#dialog'))return;const b=e.target.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)close();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){holding=false;clearInterval(milestoneTimer);}});window.addEventListener('hashchange',()=>{if($('#dialog').open)close();render();window.scrollTo({top:0,behavior:'instant'});});document.body.classList.toggle('reduce-motion',state.reduced);$('[data-action="motion"]').setAttribute('aria-pressed',String(state.reduced));render();
+
+document.addEventListener('input',e=>{
+  workspace.input(e);
+  if(e.target.id==='activity-search'){
+    state.query=e.target.value;
+    $('#ledger').innerHTML=ledger();
+    hydrate();
+  }
+  if(e.target.matches('[data-scrub]')){
+    clearInterval(milestoneTimer);
+    stepMilestone(e.target.value);
+  }
+});
+
+document.addEventListener('submit',e=>workspace.submit(e));
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('.arena-art')&&[' ','Enter'].includes(e.key)){e.preventDefault();milestones();}
+  if(e.target.matches('[data-render="fallback"]')&&['ArrowRight','ArrowLeft','Enter',' '].includes(e.key)){
+    e.preventDefault();
+    if(e.target.id==='collection-canvas'&&['ArrowRight','ArrowLeft'].includes(e.key))selectReward(state.selected+(e.key==='ArrowRight'?1:-1));
+    else e.target.querySelector('.collector')?.classList.toggle('flipped');
+  }
+});
+
+$('#dialog').addEventListener('close',()=>{modalEpoch++;modalScene?.dispose();modalScene=null;cancelAnimationFrame(holdFrame);clearInterval(milestoneTimer);document.body.classList.remove('modal-open');});
+$('#dialog').addEventListener('click',e=>{
+  if(e.target!==$('#dialog'))return;
+  const b=e.target.getBoundingClientRect();
+  if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)close();
+});
+
+document.addEventListener('visibilitychange',()=>{if(document.hidden){holding=false;clearInterval(milestoneTimer);}});
+window.addEventListener('hashchange',()=>{if($('#dialog').open)close();render();window.scrollTo({top:0,behavior:'instant'});});
+
+document.body.classList.toggle('reduce-motion',state.reduced);
+$('[data-action="motion"]').setAttribute('aria-pressed',String(state.reduced));
+render();

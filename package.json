@@ -1,0 +1,8 @@
+{
+  "name": "orion-points",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "gh-pages -d dist"
+  }
+}
